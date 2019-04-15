@@ -1,0 +1,8 @@
+London; Fine; October 12, 2000; 12:30:2000.
+Tokyo; Fine; October 12, 2000; 13:30:2000.
+Paris; Clouded; October 12, 2000; 13:30:2000.
+Beijing; Clouded; October 12, 2000; 13:30:2000.
+Jacarta; Fine; October 12, 2000; 13:30:2000.
+Maiami; Fine; October 12, 2000; 13:30:2000.
+Berlin; Fine; October 15, 2000; 13:30:2000.
+Bonn;  Fine; October 15, 2000; 13:30:2000.
