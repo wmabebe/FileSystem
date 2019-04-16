@@ -8,15 +8,15 @@ public class checkfh
 {
     public static void main(String argv[])
     {
-	filehandle fh1, fh2;
+	FileHandle fh1, fh2;
 
-	fh1=new filehandle();
+	fh1=new FileHandle();
 	System.out.println("one made.");
 
 	if (fh1.isAlive()) 
 	        System.out.println("one is alive.");
 
-	fh2=new filehandle();
+	fh2=new FileHandle();
 	System.out.println("two made.");
 	if (fh2.isAlive()) 
 	        System.out.println("two is alive.");

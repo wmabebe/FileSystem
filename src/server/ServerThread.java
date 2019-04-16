@@ -5,6 +5,7 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.net.Socket;
@@ -48,6 +49,11 @@ public class ServerThread extends Thread {
 			case "read":
 					response = read(filename,query.getOffset(),query.getReadSize());
 					out.writeObject(response);
+				break;
+			case "write":
+					response = write(filename,query.getOffset(),content.getBytes());
+					out.writeObject(response);
+				break;
 			default:
 				break;
 			}
@@ -90,7 +96,8 @@ public class ServerThread extends Thread {
 	 * Reads the file
 	 * 
 	 * @param filename  File to be read
-	 * @param bytes  Bytes read from file
+	 * @param offset  Offset value starting from where in the byte array content will be written to
+	 * @param readSize  Size in bytes of the byteArray (Content to be read)
 	 * @return
 	 * @throws IOException, FileNotFoundException 
 	 * @throws FileNotFoundException 
@@ -100,10 +107,33 @@ public class ServerThread extends Thread {
 		File file = new File (fileSystem + "/" + filename);
 		if (file.exists()) {
 			FileInputStream fStream = new FileInputStream(file);
-			byte[] data = new byte [Message.BYTESIZE];
+			byte[] data = new byte [readSize];
 			fStream.read(data, offset, readSize);
 			System.out.println("Read: " + new String(data));
 			Message message = new Message(true,new String(data),Type.RESPONSE);
+			fStream.close();
+			return message;
+		}
+		return new Message(false,"Failed to locate file " + filename,Type.RESPONSE);
+	}
+	
+	/**
+	 * This method writes the specified data, starting from the offset
+	 * value in the byte array data, to the specified.
+	 * 
+	 * @param filename
+	 * @param offset
+	 * @param data
+	 * @return
+	 * @throws IOException 
+	 */
+	private Message write (String filename,int offset,byte[] data) throws IOException {
+		File file = new File (fileSystem + "/" + filename);
+		if (file.exists()) {
+			FileOutputStream fStream = new FileOutputStream(file);
+			fStream.write(data, offset, data.length);
+			String lastModified = new SimpleDateFormat("dd-MM-yyyy HH-mm-ss").format(new Date(file.lastModified()));
+			Message message = new Message(true,lastModified,Type.RESPONSE);
 			fStream.close();
 			return message;
 		}

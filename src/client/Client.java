@@ -16,16 +16,18 @@ import api.Message;
 
 public class Client implements fileSystemAPI{
 	
-	private Hashtable fileHandleTable;
+	private Hashtable<String,FileHandle> fileHandleTable;
+	private Hashtable<FileHandle,String> fileNameTable;
 	private Socket socket;
 	private String serverHost;
 	private int serverPort;
 	private ObjectInputStream in;
 	private ObjectOutputStream out;
-	public static final String HELP = "Available commands:\n" 
+	public static final String HELP = "Available commands:\n"
+			   + "open <filename> - Opens a remote file and associates a local fileHandle\n"
 			   + "ls - Lists the available files\n"
 	           + "make <filename> <contents> - create a file with the given name \n"
-	           + "read <filename> [bytelen] - read bytelen bytes from a file named filename\n"
+	           + "read <filename> [byteSize] - read bytelen bytes from a file named filename\n"
 	           + "write <filename> <content> - write content to a file named filename\n"
 	           + "rm <filename> - Remove a file\n"
 	           + "help - displays this message\n" 
@@ -33,6 +35,7 @@ public class Client implements fileSystemAPI{
 	
 	public Client(String remoteHost,int port) {
 		this.fileHandleTable = new Hashtable();
+		this.fileNameTable = new Hashtable();
 		this.serverHost = remoteHost;
 		this.serverPort = port;
 		
@@ -70,6 +73,7 @@ public class Client implements fileSystemAPI{
     		if (response.getStatus() && ! fileHandleTable.containsKey(filename)) {
     			fileHandle = new FileHandle();
     			fileHandleTable.put(filename, fileHandle);
+    			fileNameTable.put(fileHandle, filename);
     		}
     		else if (fileHandleTable.containsKey(filename))
     			fileHandle = (FileHandle) fileHandleTable.get(filename);
@@ -85,19 +89,14 @@ public class Client implements fileSystemAPI{
 
 	@Override
 	public int read(FileHandle fh, byte[] data) throws IOException {
-		String filename = "";
-		for(Object entry: fileHandleTable.entrySet()){
-            if(fh.equals( ((Map.Entry) entry).getValue())){
-                filename = (String) ((Map.Entry) entry).getKey();
-                break;
-            }
-        }
-		
+		String filename = fileNameTable.get(fh) != null ? (String) fileNameTable.get(fh) : "";
+		if (filename.equals("")) {
+			System.out.println("0 bytes read. File not opened!\n>");
+			return 0;
+		}
     	String queryString = "read " + filename;
-    	System.out.println(queryString);
     	Message query = new Message(false,queryString,Type.QUERY);
-    	query.setOffset(0);
-    	query.setreadSize(Message.BYTESIZE);
+    	query.setreadSize(data.length);
     	out.writeObject(query);
     	Message response = null;
     	try {
@@ -120,7 +119,29 @@ public class Client implements fileSystemAPI{
 	
 	@Override
 	public boolean write(FileHandle fh, byte[] data) throws IOException {
-		// TODO Auto-generated method stub
+		String filename = fileNameTable.get(fh) != null ? (String) fileNameTable.get(fh) : "";
+		if (filename.equals("")) {
+			System.out.println("0 bytes written. File not opened!\n>");
+			return false;
+		}
+		String content = new String(data);
+		String queryString = "write " + filename + " " + content;
+    	Message query = new Message(false,queryString,Type.QUERY);
+    	out.writeObject(query);
+    	Message response = null;
+    	try {
+    		response = (Message) in.readObject();
+    		if (response.getStatus()) {
+    			System.out.println(data.length + " bytes written to "+ filename + " @ " + response.getMessage());
+    			return true;
+    		}
+    		else
+    			System.out.println(response.getMessage());
+
+    	}
+    	catch (ClassNotFoundException ex) {
+    		System.out.println(ex.getMessage());
+    	}
 		return false;
 	}
 
@@ -143,6 +164,7 @@ public class Client implements fileSystemAPI{
 		Client client = new Client(serverHost,serverPort);
 		Scanner scanner = new Scanner(System.in);
 		Scanner sc;
+		FileHandle fh;
 		String line,command,argument,content;
 		System.out.print(HELP);
 		do {
@@ -158,22 +180,38 @@ public class Client implements fileSystemAPI{
 					client.disconnect();
 					break;
 				case "read":
-					FileHandle fh = (FileHandle) client.fileHandleTable.get(argument);
+					fh = (FileHandle) client.fileHandleTable.get(argument);
 					if (fh != null) {
+						int byteSize = Message.BYTESIZE;
+						if (sc.hasNext()) {
+							String size = sc.next().trim();
+							byteSize = size.matches("\\d+") ? Integer.parseInt(size) : byteSize;
+						}
+						byte[] bytesRead = new byte[byteSize];
 						client.connect();
-						byte[] bytesRead = new byte[Message.BYTESIZE];
 						client.read(fh,bytesRead);
 						client.disconnect();
 					}
+					else
+						System.out.println("0 bytes read. File not opened yet!");
 					break;
 				case "write":
-					content = sc.hasNextLine() ? sc.next().trim() : "";
+					fh = (FileHandle) client.fileHandleTable.get(argument);
+					if (fh != null) {
+						content = sc.hasNextLine() ? sc.nextLine().trim() : "";
+						byte[] bytesRead = content.getBytes();
+						client.connect();						
+						client.write(fh,bytesRead);
+						client.disconnect();
+					}
+					else
+						System.out.println("0 bytes written. File not opened yet!");
 					break;
 				default:
 					System.out.print("$ Unknown command '" + command + "'. Type 'HELP' for more information");
 					break;
 			}
-			
+			sc.close();
 		}while(! command.equals("quit"));
 		scanner.close();
 		System.out.println("$ Bye!");
