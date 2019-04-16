@@ -4,8 +4,12 @@ import java.io.ObjectOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 
 import api.fileSystemAPI;
+
+import java.util.Date;
 import java.util.Hashtable;
 import java.util.Scanner;
 import java.util.Map;
@@ -158,6 +162,43 @@ public class Client implements fileSystemAPI{
 		return false;
 	}
 	
+	public Date lastModified(String filename) throws IOException {
+		String queryString = "open " + filename;
+    	Message query = new Message(false,queryString,Type.QUERY);
+    	out.writeObject(query);
+    	Message response = null;
+    	Date date = null;
+    	try {
+    		response = (Message) in.readObject();
+    		if (response.getStatus()) {
+    			Scanner scanner = new Scanner(response.getMessage());
+    			if (scanner.hasNext()) {
+    				String dateStr1 = scanner.next();
+    				if (scanner.hasNext()) {
+	    				String dateStr2 = scanner.next();
+	    				System.out.println("> Last modified: " + dateStr1 + " " + dateStr2);
+	    				date = new SimpleDateFormat("dd-MM-yyyy HH-mm-ss").parse(dateStr1 + " " + dateStr2);
+	    				return date;
+    				}
+    			}
+    		}
+    		else
+    			System.out.println(response.getMessage());
+
+    	}
+    	catch (ClassNotFoundException ex) {
+    		System.out.println(ex.getMessage());
+    	} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return date;
+	}
+	
 	public static void main(String[] args) throws UnknownHostException, IOException {
 		String serverHost = args.length > 0 ? args[0] : "localhost";
 		int serverPort = args.length > 1 ? Integer.parseInt(args[1]) : 4444;
@@ -187,6 +228,11 @@ public class Client implements fileSystemAPI{
 							String size = sc.next().trim();
 							byteSize = size.matches("\\d+") ? Integer.parseInt(size) : byteSize;
 						}
+						
+						if (fh.getCache() != null && fh.getCache().length >= byteSize) {
+							
+						}
+						
 						byte[] bytesRead = new byte[byteSize];
 						client.connect();
 						client.read(fh,bytesRead);
@@ -206,6 +252,11 @@ public class Client implements fileSystemAPI{
 					}
 					else
 						System.out.println("0 bytes written. File not opened yet!");
+					break;
+				case "lm":
+					client.connect();						
+					client.lastModified(argument);
+					client.disconnect();
 					break;
 				default:
 					System.out.print("$ Unknown command '" + command + "'. Type 'HELP' for more information");
