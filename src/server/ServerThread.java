@@ -11,6 +11,7 @@ import java.io.ObjectInputStream;
 import java.net.Socket;
 import java.util.Date;
 import java.util.Scanner;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import api.Message;
 import api.Type;
@@ -101,6 +102,7 @@ public class ServerThread extends Thread {
 	 * @return
 	 * @throws IOException, FileNotFoundException 
 	 * @throws FileNotFoundException 
+	 * @throws ParseException 
 	 */
 	
 	private Message read(String filename,int offset,int readSize) throws IOException, FileNotFoundException {
@@ -111,6 +113,16 @@ public class ServerThread extends Thread {
 			fStream.read(data, offset, readSize);
 			System.out.println("Read: " + new String(data));
 			Message message = new Message(true,new String(data),Type.RESPONSE);
+			String lastModifiedStr = new SimpleDateFormat("dd-MM-yyyy HH-mm-ss").format(new Date(file.lastModified()));
+			Date lastModified;
+			try {
+				lastModified = new SimpleDateFormat("dd-MM-yyyy HH-mm-ss").parse(lastModifiedStr);
+				message.setLastModified(lastModified);
+			} catch (ParseException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
 			fStream.close();
 			return message;
 		}

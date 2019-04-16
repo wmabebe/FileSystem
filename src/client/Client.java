@@ -93,6 +93,8 @@ public class Client implements fileSystemAPI{
 
 	@Override
 	public int read(FileHandle fh, byte[] data) throws IOException {
+		if (fh == null || data.length <= 0)
+			return 0;
 		String filename = fileNameTable.get(fh) != null ? (String) fileNameTable.get(fh) : "";
 		if (filename.equals("")) {
 			System.out.println("0 bytes read. File not opened!\n>");
@@ -107,6 +109,8 @@ public class Client implements fileSystemAPI{
     		response = (Message) in.readObject();
     		if (response.getStatus()) {
     			data = response.getMessage().getBytes();
+    			fh.setLastModified(response.getLastModified());
+    			fh.setChache(data);
     			System.out.println(data.length + " bytes read\n> " + response.getMessage());
     		}
     		else
@@ -162,7 +166,7 @@ public class Client implements fileSystemAPI{
 		return false;
 	}
 	
-	public Date lastModified(String filename) throws IOException {
+	private Date lastModified(String filename) throws IOException {
 		String queryString = "open " + filename;
     	Message query = new Message(false,queryString,Type.QUERY);
     	out.writeObject(query);
@@ -229,10 +233,16 @@ public class Client implements fileSystemAPI{
 							byteSize = size.matches("\\d+") ? Integer.parseInt(size) : byteSize;
 						}
 						
-						if (fh.getCache() != null && fh.getCache().length >= byteSize) {
-							
-						}
+						client.connect();
+						Date lastModified = client.lastModified(argument);
+						client.disconnect();
 						
+						if (fh.getLastModified() != null && fh.getLastModified().compareTo(lastModified) >= 0) {		
+							if (fh.getCache() != null && fh.getCache().length >= byteSize) {
+								System.out.println(fh.getCache().length + " cache bytes read\n> " + new String(fh.getCache()));
+								break;
+							}
+						}
 						byte[] bytesRead = new byte[byteSize];
 						client.connect();
 						client.read(fh,bytesRead);

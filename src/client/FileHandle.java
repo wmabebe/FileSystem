@@ -1,5 +1,6 @@
 package client;
 
+import java.util.Date;
 
 /* You can change implementation as you like. This is a simple one. */
 
@@ -12,6 +13,7 @@ public class FileHandle
     private int index;
     private static int cnt = 1;
     private byte[] cache = null;
+    private Date lastModified;
 
     public FileHandle()
     {
@@ -47,6 +49,14 @@ public class FileHandle
     
     public byte[] getCache() {
     	return cache;
+    }
+    
+    public void setLastModified(Date date) {
+    	lastModified = date;
+    }
+    
+    public Date getLastModified() {
+    	return lastModified;
     }
     
     @Override

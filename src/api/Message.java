@@ -1,6 +1,7 @@
 package api;
 
 import java.io.Serializable;
+import java.util.Date;
 
 public class Message implements Serializable{
 	private boolean status;
@@ -8,6 +9,7 @@ public class Message implements Serializable{
 	private Type type;
 	private int offset, readSize;
 	public final static int BYTESIZE = 128;
+	private Date lastModified;
 	
 	public Message(boolean st, String msg, Type t) {
 		status = st;
@@ -41,6 +43,14 @@ public class Message implements Serializable{
 	
 	public int getReadSize() {
 		return readSize;
+	}
+	
+	public void setLastModified(Date date) {
+		lastModified = date;
+	}
+	
+	public Date getLastModified() {
+		return lastModified;
 	}
 	
 }
