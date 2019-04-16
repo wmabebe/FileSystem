@@ -37,4 +37,9 @@ public class FileHandle
     public int getIndex() {
     	return index;
     }
+    
+    @Override
+    public String toString() {
+    	return this.index + "/" + cnt;
+    }
 }

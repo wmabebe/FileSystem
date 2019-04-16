@@ -17,6 +17,8 @@ public class Client implements fileSystemAPI{
 	
 	private Hashtable fileHandleTable;
 	private Socket socket;
+	private String serverHost;
+	private int serverPort;
 	private ObjectInputStream in;
 	private ObjectOutputStream out;
 	public static final String HELP = "Available commands:\n" 
@@ -28,27 +30,50 @@ public class Client implements fileSystemAPI{
 	           + "help - displays this message\n" 
 	           + "exit - Exits the client\n";
 	
-	public Client(String remoteHost,int port) throws UnknownHostException, IOException {
+	public Client(String remoteHost,int port) {
 		this.fileHandleTable = new Hashtable();
-		socket = new Socket(remoteHost,port);
+		this.serverHost = remoteHost;
+		this.serverPort = port;
+		
+	}
+	
+	public void connect() throws UnknownHostException, IOException {
+		socket = new Socket(getServerHost(),getServerPort());
 		out = new ObjectOutputStream(socket.getOutputStream());
 		in = new ObjectInputStream(socket.getInputStream());
+	}
+	
+	public void disconnect() throws IOException {
+		out.close();
+		in.close();
+		socket.close();
+	}
+	
+	public String getServerHost() {
+		return serverHost;
+	}
+	
+	public int getServerPort() {
+		return serverPort;
 	}
 
 	@Override
 	public FileHandle open(String filename) throws IOException {
-    	FileHandle fileHandle = new FileHandle();
+		FileHandle fileHandle = null;
     	String queryString = "open " + filename;
     	Message query = new Message(false,queryString,Type.QUERY);
-    	System.out.println("Composed: " + queryString);
     	out.writeObject(query);
-    	System.out.println("Written: " + queryString);
-    	//out.writeUTF("open " + filename);
     	Message response;
     	try {
     		response = (Message) in.readObject();
-    		System.out.println("$ " + response.getMessage() + "\t filehandle = " + fileHandle.getIndex());
-    		fileHandleTable.put(fileHandle, filename);
+    		if (response.getStatus() && ! fileHandleTable.containsKey(filename)) {
+    			fileHandle = new FileHandle();
+    			fileHandleTable.put(filename, fileHandle);
+    		}
+    		else if (fileHandleTable.containsKey(filename))
+    			fileHandle = (FileHandle) fileHandleTable.get(filename);
+    		
+    		System.out.println("$ " + response.getMessage() + "\t filehandle = " + fileHandle);
     	}
     	catch (ClassNotFoundException ex) {
     		System.out.println(ex.getMessage());
@@ -97,9 +122,9 @@ public class Client implements fileSystemAPI{
 			argument = sc.hasNext() ? sc.next().trim() : "";
 			switch (command) {
 				case "open":
-					System.out.println("opening");
+					client.connect();
 					client.open(argument);
-					System.out.println("opened");
+					client.disconnect();
 					break;
 				case "read":
 					
@@ -109,7 +134,7 @@ public class Client implements fileSystemAPI{
 					break;
 			}
 			
-		}while(scanner.hasNextLine() && ! command.equals("quit"));
+		}while(! command.equals("quit"));
 		scanner.close();
 		System.out.println("$ Bye!");
 	}

@@ -21,7 +21,6 @@ public class ServerThread extends Thread {
 	public ServerThread(Socket cSock) throws IOException {
 		clientSocket = cSock;
 		out =new ObjectOutputStream( clientSocket.getOutputStream());
-		//out.flush();
 		in = new ObjectInputStream( clientSocket.getInputStream());
 		this.start();
 	}
@@ -55,7 +54,14 @@ public class ServerThread extends Thread {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+		finally {
+			try {
+				clientSocket.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	/**
