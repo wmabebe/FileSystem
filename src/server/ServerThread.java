@@ -1,7 +1,10 @@
 package server;
 
 import java.io.ObjectOutputStream;
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.net.Socket;
@@ -30,6 +33,7 @@ public class ServerThread extends Thread {
 		String readLine;
 		try {
 			Message query = (Message) in.readObject();
+			Message response;
 			System.out.println("Query msg: " + query.getMessage());
 			Scanner scanner = new Scanner(query.getMessage());
 			String command = scanner.hasNext() ? scanner.next().trim() : "" ;
@@ -38,11 +42,12 @@ public class ServerThread extends Thread {
 			
 			switch(command) {
 			case "open":
-					Message response = open(filename);
+					response = open(filename);
 					out.writeObject(response);
 				break;
-			case "hello":
-				out.flush();
+			case "read":
+					response = read(filename,query.getOffset(),query.getReadSize());
+					out.writeObject(response);
 			default:
 				break;
 			}
@@ -87,10 +92,22 @@ public class ServerThread extends Thread {
 	 * @param filename  File to be read
 	 * @param bytes  Bytes read from file
 	 * @return
+	 * @throws IOException, FileNotFoundException 
+	 * @throws FileNotFoundException 
 	 */
 	
-	private Message read(String filename,byte[] bytes) {
-		return null;
+	private Message read(String filename,int offset,int readSize) throws IOException, FileNotFoundException {
+		File file = new File (fileSystem + "/" + filename);
+		if (file.exists()) {
+			FileInputStream fStream = new FileInputStream(file);
+			byte[] data = new byte [Message.BYTESIZE];
+			fStream.read(data, offset, readSize);
+			System.out.println("Read: " + new String(data));
+			Message message = new Message(true,new String(data),Type.RESPONSE);
+			fStream.close();
+			return message;
+		}
+		return new Message(false,"Failed to locate file " + filename,Type.RESPONSE);
 	}
 
 }

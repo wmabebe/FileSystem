@@ -8,6 +8,7 @@ import java.net.UnknownHostException;
 import api.fileSystemAPI;
 import java.util.Hashtable;
 import java.util.Scanner;
+import java.util.Map;
 
 import api.Type;
 import api.Message;
@@ -83,16 +84,46 @@ public class Client implements fileSystemAPI{
 	}
 
 	@Override
+	public int read(FileHandle fh, byte[] data) throws IOException {
+		String filename = "";
+		for(Object entry: fileHandleTable.entrySet()){
+            if(fh.equals( ((Map.Entry) entry).getValue())){
+                filename = (String) ((Map.Entry) entry).getKey();
+                break;
+            }
+        }
+		
+    	String queryString = "read " + filename;
+    	System.out.println(queryString);
+    	Message query = new Message(false,queryString,Type.QUERY);
+    	query.setOffset(0);
+    	query.setreadSize(Message.BYTESIZE);
+    	out.writeObject(query);
+    	Message response = null;
+    	try {
+    		response = (Message) in.readObject();
+    		if (response.getStatus()) {
+    			data = response.getMessage().getBytes();
+    			System.out.println(data.length + " bytes read\n> " + response.getMessage());
+    		}
+    		else
+    			System.out.println(response.getMessage());
+
+    	}
+    	catch (ClassNotFoundException ex) {
+    		System.out.println(ex.getMessage());
+    	}
+
+		return data != null ? data.length : 0;
+
+	}
+	
+	@Override
 	public boolean write(FileHandle fh, byte[] data) throws IOException {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
-	public int read(FileHandle fh, byte[] data) throws IOException {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 
 	@Override
 	public boolean close(FileHandle fh) throws IOException {
@@ -112,7 +143,7 @@ public class Client implements fileSystemAPI{
 		Client client = new Client(serverHost,serverPort);
 		Scanner scanner = new Scanner(System.in);
 		Scanner sc;
-		String line,command,argument;
+		String line,command,argument,content;
 		System.out.print(HELP);
 		do {
 			System.out.print("\n$ ");
@@ -127,10 +158,19 @@ public class Client implements fileSystemAPI{
 					client.disconnect();
 					break;
 				case "read":
-					
+					FileHandle fh = (FileHandle) client.fileHandleTable.get(argument);
+					if (fh != null) {
+						client.connect();
+						byte[] bytesRead = new byte[Message.BYTESIZE];
+						client.read(fh,bytesRead);
+						client.disconnect();
+					}
+					break;
+				case "write":
+					content = sc.hasNextLine() ? sc.next().trim() : "";
 					break;
 				default:
-					//System.out.print("$ Unknown command '" + command + "'. Type 'HELP' for more information");
+					System.out.print("$ Unknown command '" + command + "'. Type 'HELP' for more information");
 					break;
 			}
 			
