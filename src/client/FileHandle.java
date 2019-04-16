@@ -13,6 +13,7 @@ public class FileHandle
     private int index;
     private static int cnt = 1;
     private byte[] cache = null;
+    private boolean flush;
     private Date lastModified;
 
     public FileHandle()
@@ -62,5 +63,13 @@ public class FileHandle
     @Override
     public String toString() {
     	return this.index + "/" + cnt;
+    }
+    
+    public void setFlush(boolean b) {
+    	flush = b;
+    }
+    
+    public boolean getFlush() {
+    	return flush;
     }
 }

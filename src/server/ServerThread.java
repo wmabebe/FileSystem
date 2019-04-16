@@ -1,7 +1,6 @@
 package server;
 
 import java.io.ObjectOutputStream;
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -21,7 +20,7 @@ public class ServerThread extends Thread {
 	private ObjectInputStream in;
 	private ObjectOutputStream out;
 	Socket clientSocket;
-	private final String fileSystem = "filesystem";
+	private final static String FILESYSTEM = "filesystem";
 	
 	public ServerThread(Socket cSock) throws IOException {
 		clientSocket = cSock;
@@ -29,6 +28,11 @@ public class ServerThread extends Thread {
 		in = new ObjectInputStream( clientSocket.getInputStream());
 		this.start();
 	}
+	
+	/**
+	 * This method is called whenever start() is invoked in the constructor.
+	 * It listens and switches client commands. 
+	 */
 	
 	@Override
 	public void run() {
@@ -54,6 +58,14 @@ public class ServerThread extends Thread {
 			case "write":
 					response = write(filename,query.getOffset(),content.getBytes());
 					out.writeObject(response);
+				break;
+			case "ls":
+				File file = new File (FILESYSTEM + "/");
+				String list = "";
+				for (String fname : file.list())
+					list += fname + " ";
+				response = new Message(true,list,Type.RESPONSE);
+				out.writeObject(response);
 				break;
 			default:
 				break;
@@ -85,7 +97,7 @@ public class ServerThread extends Thread {
 	 * @return True if the file exists
 	 */
 	private Message open(String filename) {
-		File file = new File (fileSystem + "/" + filename);
+		File file = new File (FILESYSTEM + "/" + filename);
 		if (file.exists()) {
 			String lastModified = new SimpleDateFormat("dd-MM-yyyy HH-mm-ss").format(new Date(file.lastModified()));
 			return new Message(true,lastModified + " : " + filename,Type.RESPONSE);
@@ -106,7 +118,7 @@ public class ServerThread extends Thread {
 	 */
 	
 	private Message read(String filename,int offset,int readSize) throws IOException, FileNotFoundException {
-		File file = new File (fileSystem + "/" + filename);
+		File file = new File (FILESYSTEM + "/" + filename);
 		if (file.exists()) {
 			FileInputStream fStream = new FileInputStream(file);
 			byte[] data = new byte [readSize];
@@ -131,7 +143,7 @@ public class ServerThread extends Thread {
 	
 	/**
 	 * This method writes the specified data, starting from the offset
-	 * value in the byte array data, to the specified.
+	 * value in the byte array data, to the specified byte array.
 	 * 
 	 * @param filename
 	 * @param offset
@@ -140,7 +152,7 @@ public class ServerThread extends Thread {
 	 * @throws IOException 
 	 */
 	private Message write (String filename,int offset,byte[] data) throws IOException {
-		File file = new File (fileSystem + "/" + filename);
+		File file = new File (FILESYSTEM + "/" + filename);
 		if (file.exists()) {
 			FileOutputStream fStream = new FileOutputStream(file);
 			fStream.write(data, offset, data.length);

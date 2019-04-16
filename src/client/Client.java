@@ -12,7 +12,6 @@ import api.fileSystemAPI;
 import java.util.Date;
 import java.util.Hashtable;
 import java.util.Scanner;
-import java.util.Map;
 
 import api.Type;
 import api.Message;
@@ -29,14 +28,15 @@ public class Client implements fileSystemAPI{
 	private ObjectOutputStream out;
 	public static final String HELP = "Available commands:\n"
 			   + "open <filename> - Opens a remote file and associates a local fileHandle\n"
+			   + "close <filename> - Closes the local fileHandle for the file\n"
 			   + "lm <filename> - Check last modified time of file on server\n"
 			   + "ls - Lists the available files\n"
-	           + "make <filename> <contents> - create a file with the given name \n"
 	           + "read <filename> [byteSize] - read bytelen bytes from a file named filename\n"
-	           + "write <filename> <content> - write content to a file named filename\n"
-	           + "rm <filename> - Remove a file\n"
+	           + "write <filename> [-c] <content> - write content to a file named filename\n"
+	           + "[ make <filename> <contents> - create a file with the given name ]\n"
+	           + "[ rm <filename> - Remove a file ]\n"
 	           + "help - displays this message\n" 
-	           + "exit - Exits the client\n";
+	           + "quit/q/exit - Quit the client program\n";
 	
 	public Client(String remoteHost,int port) {
 		this.fileHandleTable = new Hashtable();
@@ -46,26 +46,48 @@ public class Client implements fileSystemAPI{
 		
 	}
 	
+	/**
+	 * Create a connection with the server, setup socket I/O streams
+	 * @throws UnknownHostException
+	 * @throws IOException
+	 */
 	public void connect() throws UnknownHostException, IOException {
 		socket = new Socket(getServerHost(),getServerPort());
 		out = new ObjectOutputStream(socket.getOutputStream());
 		in = new ObjectInputStream(socket.getInputStream());
 	}
 	
+	/**
+	 * Disconnect from the server, close streams
+	 * @throws IOException
+	 */
 	public void disconnect() throws IOException {
 		out.close();
 		in.close();
 		socket.close();
 	}
 	
+	/**
+	 * Returns the IP address of the server
+	 * @return serverHost  IP address of server
+	 */
 	public String getServerHost() {
 		return serverHost;
 	}
 	
+	/**
+	 * Returns the port of the server application 
+	 * @return serverPort  Port number of the server application
+	 */
 	public int getServerPort() {
 		return serverPort;
 	}
 
+	/**
+	 * Open a remote file on the server that has name 'filename'.
+	 * Associate a FileHandle object with it and return the fileHandle.
+	 * @return fileHandle  A handle to the opened file
+	 */
 	@Override
 	public FileHandle open(String filename) throws IOException {
 		FileHandle fileHandle = null;
@@ -92,6 +114,10 @@ public class Client implements fileSystemAPI{
 		return fileHandle;
 	}
 
+	/**
+	 * Read data from remote file into the provided data
+	 * @return bytesRead
+	 */
 	@Override
 	public int read(FileHandle fh, byte[] data) throws IOException {
 		if (fh == null || data.length <= 0)
@@ -112,6 +138,7 @@ public class Client implements fileSystemAPI{
     			data = response.getMessage().getBytes();
     			fh.setLastModified(response.getLastModified());
     			fh.setChache(data);
+    			fh.setFlush(false);
     			System.out.println(data.length + " bytes read\n> " + response.getMessage());
     		}
     		else
@@ -126,6 +153,10 @@ public class Client implements fileSystemAPI{
 
 	}
 	
+	/**
+	 * write specified data into remote file
+	 * @return status  True if write was successful
+	 */
 	@Override
 	public boolean write(FileHandle fh, byte[] data) throws IOException {
 		String filename = fileNameTable.get(fh) != null ? (String) fileNameTable.get(fh) : "";
@@ -154,11 +185,20 @@ public class Client implements fileSystemAPI{
 		return false;
 	}
 
-
+	/**
+	 * Discard the filehandle associated with the file
+	 * return status  True if closed successfully
+	 */
 	@Override
 	public boolean close(FileHandle fh) throws IOException {
 		if (fileNameTable.containsKey(fh)) {
 			String filename = fileNameTable.get(fh);
+			if (fh.getFlush()) {
+				this.connect();
+				System.out.println("* Flushing");
+				this.write(fh, fh.getCache());		
+				this.disconnect();
+			}
 			fh.discard();
 			fileNameTable.remove(fh);
 			fileHandleTable.remove(filename);
@@ -174,7 +214,21 @@ public class Client implements fileSystemAPI{
 		return false;
 	}
 	
-	private Date lastModified(String filename) throws IOException {
+	/**
+	 * List the remote files on the server
+	 */
+	public void listFS() throws IOException, ClassNotFoundException {
+		Message query = new Message(false,"ls",Type.QUERY);
+		out.writeObject(query);
+    	Message response = (Message) in.readObject();
+    	System.out.println("$ " + response.getMessage());
+	}
+	
+	/**
+	 * Return the last modified date of the remote file
+	 * @return date  Last modified date
+	 */
+	public Date lastModified(String filename) throws IOException {
 		String queryString = "open " + filename;
     	Message query = new Message(false,queryString,Type.QUERY);
     	out.writeObject(query);
@@ -211,7 +265,11 @@ public class Client implements fileSystemAPI{
 		return date;
 	}
 	
-	public static void main(String[] args) throws UnknownHostException, IOException {
+	/**
+	 * This main file is used to run the client
+	 */
+	
+	public static void main(String[] args) throws UnknownHostException, IOException, ClassNotFoundException {
 		String serverHost = args.length > 0 ? args[0] : "localhost";
 		int serverPort = args.length > 1 ? Integer.parseInt(args[1]) : 4444;
 		Client client = new Client(serverHost,serverPort);
@@ -245,6 +303,11 @@ public class Client implements fileSystemAPI{
 						Date lastModified = client.lastModified(argument);
 						client.disconnect();
 						
+						if (fh.getFlush()) {
+							System.out.println(fh.getCache().length + " cache bytes read\n> " + new String(fh.getCache()));
+							break;
+						}
+						
 						if (fh.getLastModified() != null && fh.getLastModified().compareTo(lastModified) >= 0) {		
 							if (fh.getCache() != null && fh.getCache().length >= byteSize) {
 								System.out.println(fh.getCache().length + " cache bytes read\n> " + new String(fh.getCache()));
@@ -263,10 +326,19 @@ public class Client implements fileSystemAPI{
 					fh = (FileHandle) client.fileHandleTable.get(argument);
 					if (fh != null) {
 						content = sc.hasNextLine() ? sc.nextLine().trim() : "";
-						byte[] bytesRead = content.getBytes();
-						client.connect();						
-						client.write(fh,bytesRead);
-						client.disconnect();
+						Scanner sc2 = new Scanner(content);
+						if (sc2.hasNext() && sc2.next().equals("-c")) {
+							content = sc2.hasNextLine() ? sc2.nextLine() : "";
+							fh.setChache(content.getBytes());
+							fh.setFlush(true);
+							System.out.println(content.getBytes().length + " bytes written to cache!");
+						}
+						else {
+							byte[] bytesRead = content.getBytes();
+							client.connect();						
+							client.write(fh,bytesRead);
+							client.disconnect();
+						}
 					}
 					else
 						System.out.println("0 bytes written. File not opened yet!");
@@ -285,6 +357,14 @@ public class Client implements fileSystemAPI{
 					break;
 				case "quit": case "exit": case "q":
 					command = "quit";
+					break;
+				case "help":
+					System.out.print(HELP);
+					break;
+				case "ls":
+					client.connect();
+					client.listFS();
+					client.disconnect();
 					break;
 				default:
 					System.out.print("$ Unknown command '" + command + "'. Type 'HELP' for more information");

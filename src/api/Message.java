@@ -3,6 +3,13 @@ package api;
 import java.io.Serializable;
 import java.util.Date;
 
+/**
+ * This serializable  Message class is used to send messages
+ * to and from the server.
+ * @author wmabebe
+ *
+ */
+
 public class Message implements Serializable{
 	private boolean status;
 	private String message;
