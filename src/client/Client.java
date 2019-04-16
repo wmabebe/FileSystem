@@ -29,6 +29,7 @@ public class Client implements fileSystemAPI{
 	private ObjectOutputStream out;
 	public static final String HELP = "Available commands:\n"
 			   + "open <filename> - Opens a remote file and associates a local fileHandle\n"
+			   + "lm <filename> - Check last modified time of file on server\n"
 			   + "ls - Lists the available files\n"
 	           + "make <filename> <contents> - create a file with the given name \n"
 	           + "read <filename> [byteSize] - read bytelen bytes from a file named filename\n"
@@ -156,7 +157,14 @@ public class Client implements fileSystemAPI{
 
 	@Override
 	public boolean close(FileHandle fh) throws IOException {
-		// TODO Auto-generated method stub
+		if (fileNameTable.containsKey(fh)) {
+			String filename = fileNameTable.get(fh);
+			fh.discard();
+			fileNameTable.remove(fh);
+			fileHandleTable.remove(filename);
+			System.out.println("Closed: " + filename);
+			return true;
+		}
 		return false;
 	}
 
@@ -267,6 +275,16 @@ public class Client implements fileSystemAPI{
 					client.connect();						
 					client.lastModified(argument);
 					client.disconnect();
+					break;
+				case "close":
+					fh = (FileHandle) client.fileHandleTable.get(argument);
+					if (fh == null)
+						System.out.println("Failed: File '" + argument + "' not open!");
+					else
+						client.close(fh);
+					break;
+				case "quit": case "exit": case "q":
+					command = "quit";
 					break;
 				default:
 					System.out.print("$ Unknown command '" + command + "'. Type 'HELP' for more information");
