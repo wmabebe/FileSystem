@@ -15,6 +15,12 @@ import java.text.SimpleDateFormat;
 import api.Message;
 import api.Type;
 
+/**
+ * This is a server thread class that is instantiated
+ * to handle client connections.
+ * @author mac
+ *
+ */
 
 public class ServerThread extends Thread {
 	private ObjectInputStream in;
@@ -122,7 +128,11 @@ public class ServerThread extends Thread {
 		if (file.exists()) {
 			FileInputStream fStream = new FileInputStream(file);
 			byte[] data = new byte [readSize];
-			fStream.read(data, offset, readSize);
+			if (offset < file.length())
+				fStream.skip(offset);
+			else
+				return  new Message(false,"EOF!",Type.RESPONSE);
+			fStream.read(data);
 			System.out.println("Read: " + new String(data));
 			Message message = new Message(true,new String(data),Type.RESPONSE);
 			String lastModifiedStr = new SimpleDateFormat("dd-MM-yyyy HH-mm-ss").format(new Date(file.lastModified()));

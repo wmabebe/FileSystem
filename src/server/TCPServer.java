@@ -5,6 +5,11 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+/**
+ * This is the multithreaded TCP server
+ * @author wmabebe
+ */
+
 public class TCPServer {
 	
 	/**

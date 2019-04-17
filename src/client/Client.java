@@ -9,6 +9,7 @@ import java.text.SimpleDateFormat;
 
 import api.fileSystemAPI;
 
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Hashtable;
 import java.util.Scanner;
@@ -16,7 +17,13 @@ import java.util.Scanner;
 import api.Type;
 import api.Message;
 
-
+/**
+ * This is the Client class the implements the fileSystemAPI.
+ * It creates a TCP connection via a client socket.
+ * It performs the commands not surrounded with [] brackets shown below.
+ * @author wmabebe
+ *
+ */
 public class Client implements fileSystemAPI{
 	
 	private Hashtable<String,FileHandle> fileHandleTable;
@@ -31,10 +38,11 @@ public class Client implements fileSystemAPI{
 			   + "close <filename> - Closes the local fileHandle for the file\n"
 			   + "lm <filename> - Check last modified time of file on server\n"
 			   + "ls - Lists the available files\n"
-	           + "read <filename> [byteSize] - read bytelen bytes from a file named filename\n"
+	           + "read <filename> [byteSize] [-a] - read bytelen bytes from a file named filename\n"
 	           + "write <filename> [-c] <content> - write content to a file named filename\n"
 	           + "[ make <filename> <contents> - create a file with the given name ]\n"
 	           + "[ rm <filename> - Remove a file ]\n"
+	           + "reset <filename> - Resets file offsets to 0\n"
 	           + "help - displays this message\n" 
 	           + "quit/q/exit - Quit the client program\n";
 	
@@ -129,6 +137,7 @@ public class Client implements fileSystemAPI{
 		}
     	String queryString = "read " + filename;
     	Message query = new Message(false,queryString,Type.QUERY);
+    	query.setOffset(fh.getOffset());
     	query.setreadSize(data.length);
     	out.writeObject(query);
     	Message response = null;
@@ -139,6 +148,7 @@ public class Client implements fileSystemAPI{
     			fh.setLastModified(response.getLastModified());
     			fh.setChache(data);
     			fh.setFlush(false);
+    			fh.setCacheOffset(0);
     			System.out.println(data.length + " bytes read\n> " + response.getMessage());
     		}
     		else
@@ -266,7 +276,41 @@ public class Client implements fileSystemAPI{
 	}
 	
 	/**
-	 * This main file is used to run the client
+	 * Read data in cache from the current offset of the filehandle
+	 * @param fh  fileHandle associated with file
+	 * @return cache  Read cache starting from fh offset
+	 */
+	private String readCache(FileHandle fh,int size) {
+		if (fh.getCacheOffset() > fh.getCache().length)
+			return null;
+		byte[] bytes = fh.getCache();
+		int endIndex = fh.getCacheOffset() + size > bytes.length ? bytes.length : fh.getCacheOffset() + size;
+		System.out.println("* CacheOffset: " + fh.getCacheOffset() + "\t plus: " + endIndex);
+		String str = new String(fh.getCache()).substring(fh.getCacheOffset(), endIndex );
+		fh.setCacheOffset( fh.getCacheOffset() + size);
+		return str;
+	}
+	
+	/**
+	 * Read all data in cache of the filehandle
+	 * @param fh  fileHandle associated with file
+	 * @return cache  Read cache starting from fh offset
+	 */
+	private String readCache(FileHandle fh) {
+		return new String(fh.getCache());
+	}
+	/**
+	 * Resets the cacheOffset back to 0
+	 * so another round of reads is possible
+	 * @param fh
+	 */
+	private void resetCacheOffset(FileHandle fh) {
+		fh.setCacheOffset(0);
+		fh.setOffset(0);
+	}
+	
+	/**
+	 * This main method is used to run the client
 	 */
 	
 	public static void main(String[] args) throws UnknownHostException, IOException, ClassNotFoundException {
@@ -277,6 +321,7 @@ public class Client implements fileSystemAPI{
 		Scanner sc;
 		FileHandle fh;
 		String line,command,argument,content;
+		
 		System.out.print(HELP);
 		do {
 			System.out.print("\n$ ");
@@ -294,30 +339,52 @@ public class Client implements fileSystemAPI{
 					fh = (FileHandle) client.fileHandleTable.get(argument);
 					if (fh != null) {
 						int byteSize = Message.BYTESIZE;
+						boolean readAll = false,readCache = false;
 						if (sc.hasNext()) {
-							String size = sc.next().trim();
-							byteSize = size.matches("\\d+") ? Integer.parseInt(size) : byteSize;
+							String next = sc.next().trim();
+							if (next.matches("\\d+"))
+								byteSize =  Integer.parseInt(next);
+							else {
+								if (next.equals("-c")) {
+									readCache = true;
+									if (sc.hasNext()) {
+										next = sc.next().trim();
+										if (next.matches("\\d+"))
+											byteSize =  Integer.parseInt(next);
+									}
+								}
+								else if (next.equals("-ca")) {
+									byteSize = fh.getCache().length;
+									 readCache =readAll = true;
+								}
+							}
+							
 						}
 						
 						client.connect();
 						Date lastModified = client.lastModified(argument);
 						client.disconnect();
 						
-						if (fh.getFlush()) {
-							System.out.println(fh.getCache().length + " cache bytes read\n> " + new String(fh.getCache()));
-							break;
-						}
-						
-						if (fh.getLastModified() != null && fh.getLastModified().compareTo(lastModified) >= 0) {		
-							if (fh.getCache() != null && fh.getCache().length >= byteSize) {
-								System.out.println(fh.getCache().length + " cache bytes read\n> " + new String(fh.getCache()));
+						if (readCache) {
+							if (fh.getFlush()) {
+								String cacheRead = client.readCache(fh,byteSize);
+								System.out.println(cacheRead != null ? cacheRead.length() : 0 + " cache bytes read\n> " + cacheRead != null ? cacheRead : "");
 								break;
+							}
+							
+							if (fh.getLastModified() != null && fh.getLastModified().compareTo(lastModified) >= 0) {		
+								if (fh.getCache() != null && fh.getCache().length >= byteSize) {
+									String cacheRead = ! readAll ? client.readCache(fh,byteSize) :  client.readCache(fh);
+									System.out.println((cacheRead != null ? cacheRead.length() : 0) + " cache bytes read\n> " + (cacheRead != null ? cacheRead : "EOF!"));
+									break;
+								}
 							}
 						}
 						byte[] bytesRead = new byte[byteSize];
 						client.connect();
 						client.read(fh,bytesRead);
 						client.disconnect();
+						fh.setOffset( fh.getOffset() + byteSize);
 					}
 					else
 						System.out.println("0 bytes read. File not opened yet!");
@@ -342,6 +409,15 @@ public class Client implements fileSystemAPI{
 					}
 					else
 						System.out.println("0 bytes written. File not opened yet!");
+					break;
+				case "reset":
+					fh = (FileHandle) client.fileHandleTable.get(argument);
+					if (fh != null) {
+						client.resetCacheOffset(fh);
+						System.out.println("'" + argument + "' offsets reset to 0");
+					}
+					else
+						System.out.println("Failed: File '" + argument + "' not open!");
 					break;
 				case "lm":
 					client.connect();						

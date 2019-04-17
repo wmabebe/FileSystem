@@ -10,7 +10,7 @@ public class FileHandle
        static variable "cnt" so that no duplication occurs.  When
        filehandle is discarded its number becomes 0. */
 
-    private int index;
+    private int index,offset,cacheOffset;
     private static int cnt = 1;
     private byte[] cache = null;
     private boolean flush;
@@ -71,5 +71,21 @@ public class FileHandle
     
     public boolean getFlush() {
     	return flush;
+    }
+    
+    public void setOffset(int p) {
+    	offset = p;
+    }
+    
+    public int getOffset() {
+    	return offset;
+    }
+    
+    public void setCacheOffset(int p) {
+    	cacheOffset = p;
+    }
+    
+    public int getCacheOffset() {
+    	return cacheOffset;
     }
 }
