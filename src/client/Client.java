@@ -53,6 +53,32 @@ public class Client implements fileSystemAPI{
 		this.serverPort = port;
 		
 	}
+	/**
+	 * This table maps the filehandle with filename and vice versa
+	 * in the two hashtables that track the mapping.
+	 * @param fh
+	 * @param filename
+	 */
+	public void mapHandle(FileHandle fh, String filename){
+		this.fileHandleTable.put(filename, fh);
+		this.fileNameTable.put(fh, filename);
+	}
+	
+	/**
+	 * 
+	 * @return fileHandleTable  The hashtable that maps handles to filenames
+	 */
+	public Hashtable<FileHandle,String> getFileNameTable(){
+		return this.fileNameTable;
+	}
+	
+	/**
+	 * 
+	 * @return fileHandleTable  The hashtable that maps filenames to handles
+	 */
+	public Hashtable<String,FileHandle> getFileHandleTable(){
+		return this.fileHandleTable;
+	}
 	
 	/**
 	 * Create a connection with the server, setup socket I/O streams
@@ -128,7 +154,7 @@ public class Client implements fileSystemAPI{
 	 */
 	@Override
 	public int read(FileHandle fh, byte[] data) throws IOException {
-		if (fh == null || data.length <= 0)
+		if (fh == null || data.length < 0)
 			return 0;
 		String filename = fileNameTable.get(fh) != null ? (String) fileNameTable.get(fh) : "";
 		if (filename.equals("")) {
@@ -149,6 +175,7 @@ public class Client implements fileSystemAPI{
     			fh.setChache(data);
     			fh.setFlush(false);
     			fh.setCacheOffset(0);
+    			fh.setOffset( fh.getOffset() + data.length);
     			System.out.println(data.length + " bytes read\n> " + response.getMessage());
     		}
     		else
@@ -217,10 +244,34 @@ public class Client implements fileSystemAPI{
 		}
 		return false;
 	}
+	
+	/**
+	 * Check if remote file offset has reached the EOF limit!
+	 * @param fh  fileHandle representing the opened file
+	 */
 
 	@Override
 	public boolean isEOF(FileHandle fh) throws IOException {
-		// TODO Auto-generated method stub
+		if (fileNameTable.containsKey(fh)) {
+			String filename = fileNameTable.get(fh);
+			Message query = new Message(false,"read " + filename,Type.QUERY);
+			query.setOffset(fh.getOffset());
+	    	query.setreadSize(0);
+			connect();
+			out.writeObject(query);
+	    	Message response = null;
+	    	try {
+				response = (Message) in.readObject();
+				return /*! response.getStatus() &&*/ response.getMessage().equals("EOF!");
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	    	finally {
+	    		disconnect();
+	    	}
+		}
+		
 		return false;
 	}
 	
@@ -280,7 +331,7 @@ public class Client implements fileSystemAPI{
 	 * @param fh  fileHandle associated with file
 	 * @return cache  Read cache starting from fh offset
 	 */
-	private String readCache(FileHandle fh,int size) {
+	public String readCache(FileHandle fh,int size) {
 		if (fh.getCacheOffset() > fh.getCache().length)
 			return null;
 		byte[] bytes = fh.getCache();
@@ -384,7 +435,6 @@ public class Client implements fileSystemAPI{
 						client.connect();
 						client.read(fh,bytesRead);
 						client.disconnect();
-						fh.setOffset( fh.getOffset() + byteSize);
 					}
 					else
 						System.out.println("0 bytes read. File not opened yet!");
